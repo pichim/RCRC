@@ -1,6 +1,8 @@
 clc, clear all
 %%
 
+% NUCLEO_H743ZI2 | NUCLEO_F446RE | NUCLEO_L432KC
+% 'COM12'        | 'COM6'        | 'COM10'
 port = 'COM10';
 baudrate = 2e6;
 
@@ -21,6 +23,21 @@ data = serialStream.getData();
 return
 
 %%
+
+% parameters
+R1 = 4.7e3;  % Ohm
+R2 = R1;
+C1 = 470e-9; % F
+C2 = C1;
+
+% rcrc
+a = R1*R2*C1*C2
+b = R1*C1 + R1*C2 + R2*C2
+
+% transfer function
+s = tf('s');
+Grcrc_mod = 1 / (a*s^2 + b*s + 1);
+
 
 Ts = mean(diff(data.time));
 
@@ -79,7 +96,7 @@ figure(2)
 plot(data.time, data.values), grid on
 
 figure(3)
-bode(G1, G2, 2*pi*G1.Frequency(G1.Frequency < 1/2/Ts)), grid on
+bode(G1, G2, Grcrc_mod, 2*pi*G1.Frequency(G1.Frequency < 1/2/Ts)), grid on
 
 opt = bodeoptions('cstprefs');
 opt.MagUnits = 'abs';
