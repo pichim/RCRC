@@ -1,0 +1,6 @@
+.vscode
+.vscode_backup
+BUILD
+.mbed
+mbed-os
+eigen
