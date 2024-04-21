@@ -51,9 +51,9 @@ void RealTimeThread::threadTask()
 
     // chirp generator
     const float f0 = 0.1f;
-    const float f1 = 0.99f / 2.0f / Ts;
-    const float t1 = 10.0f;
-    const float magnitude = 0.9f * (3.3f / 2.0f);
+    const float f1 = 1.0f / 2.0f / Ts;
+    const float t1 = 20.0f;
+    const float amplitude = 0.9f * (3.3f / 2.0f);
     const float offset = 3.3f / 2.0f;
     Chirp chirp(f0, f1, t1, Ts);
 
@@ -72,13 +72,15 @@ void RealTimeThread::threadTask()
 
         // measure delta time
         const microseconds time_us = timer.elapsed_time();
-        const float dtime_us_f = duration_cast<microseconds>(time_us - time_previous_us).count();
+        const float dtime_us = duration_cast<microseconds>(time_us - time_previous_us).count();
         time_previous_us = time_us;
 
         // read analog inputs
         float uc_1 = ain1.read() * 3.3f;
         float uc_2 = ain2.read() * 3.3f;
-        float voltage = offset;
+        float u_e = offset;
+
+        float sinarg = 0.0f;
 
         // here lifes the main logic of the mini segway
         if (_do_execute) {
@@ -86,29 +88,30 @@ void RealTimeThread::threadTask()
             // perform frequency response measurement
             if (chirp.update()) {
                 const float exc = chirp.getExc();
-                const float fchirp = chirp.getFreq();
-                const float sinarg = chirp.getSinarg();
-                voltage = magnitude * exc + offset;
+                // const float fchirp = chirp.getFreq();
+                sinarg = chirp.getSinarg();
+                u_e = amplitude * exc + offset;
             } else {
                 // toggleDoExecute();
                 _do_execute = false;
             }
 
             // write analog output
-            aout.write(voltage / 3.3f);
+            aout.write(u_e / 3.3f);
 
             // send data to serial stream
-            serialStream.write(dtime_us_f); //  0
-            serialStream.write(voltage);    //  1
+            serialStream.write(dtime_us); //  0
+            serialStream.write(u_e);        //  1
             serialStream.write(uc_1);       //  2
             serialStream.write(uc_2);       //  3
+            serialStream.write(sinarg);     //  4
             serialStream.send();
 
             led = 1;
         } else {
 
             // write analog output
-            aout.write(voltage / 3.3f);
+            aout.write(u_e / 3.3f);
 
             if (_do_reset) {
                 _do_reset = false;

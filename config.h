@@ -12,8 +12,8 @@
     // #define RTT_PERIOD_US 2500   //   400 Hz
     // #define RTT_PERIOD_US 2000   //   500 Hz
     // #define RTT_PERIOD_US 1000   //  1000 Hz
-    // #define RTT_PERIOD_US 500    //  2000 Hz
-    #define RTT_PERIOD_US 333    //  3000 Hz
+    #define RTT_PERIOD_US 500    //  2000 Hz
+    // #define RTT_PERIOD_US 333    //  3000 Hz
     // #define RTT_PERIOD_US 200    //  5000 Hz
     // #define RTT_PERIOD_US 150    //  6666 Hz
     // #define RTT_PERIOD_US 133    //  7500 Hz

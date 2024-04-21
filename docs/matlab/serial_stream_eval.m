@@ -54,43 +54,61 @@ xlim([0 data.time(end-1)])
 ylim([0 1.2*max(diff(data.time * 1e6))])
 
 
-Nest     = round(1.0 / Ts);
+% rotating filter
+Dlp = sqrt(3) / 2;
+wlp = 2 * pi * 10;
+Glp = c2d(tf(wlp^2, [1 2*Dlp*wlp wlp^2]), Ts, 'tustin');
+
+
+Nest     = round(2.0 / Ts);
 koverlap = 0.9;
 Noverlap = round(koverlap * Nest);
 window   = hann(Nest);
 
+% inp = data.values(:,1);
+% out = data.values(:,2);
+inp = apply_rotfiltfilt(Glp, data.values(:,4), data.values(:,1));
+out = apply_rotfiltfilt(Glp, data.values(:,4), data.values(:,2));
+[G1, C1] = estimate_frequency_response(inp, out, window, Noverlap, Nest, Ts);
+% inp = data.values(:,1);
+% out = data.values(:,3);
+inp = apply_rotfiltfilt(Glp, data.values(:,4), data.values(:,1));
+out = apply_rotfiltfilt(Glp, data.values(:,4), data.values(:,3));
+[G2, C2] = estimate_frequency_response(inp, out, window, Noverlap, Nest, Ts);
 
-[G1, C1] = estimate_frequency_response(data.values(:,1), ...
-    data.values(:,2), window, Noverlap, Nest, Ts);
-[G2, C2] = estimate_frequency_response(data.values(:,1), ...
-    data.values(:,3), window, Noverlap, Nest, Ts);
-
-
-% Nest     = round(40.0 / Ts);
-% koverlap = 0.5;
-% Noverlap = round(koverlap * Nest);
-% window   = hann(Nest);
-% Nest_min = round(1.0 / Ts);
-% 
-% [~, ~, f, Pavg] = estimate_frequency_response(data.signals.values(:,1), ...
-%     data.signals.values(:,2), window, Noverlap, Nest, Ts);
-% while (true)
-%     Nest = floor(Nest / 2.0);
+% for i = 1:2
+%     Nest     = round(2.0 / Ts);
+%     koverlap = 0.5;
 %     Noverlap = round(koverlap * Nest);
 %     window   = hann(Nest);
-%     if (Nest < Nest_min)
-%         break;
-%     end
-%     [~, ~, f_, Pavg_] = estimate_frequency_response(data.signals.values(:,1), ...
-%         data.signals.values(:,2), window, Noverlap, Nest, Ts);
-%     f_min = 10^(log10(min(f_(f_ > 0))) + 1.2);
-%     ind_avg = f >= f_min & f <= 1/2/Ts - f_min;
-%     Pavg_ = interp1(f_, Pavg_, f(ind_avg), 'linear');
-%     Pavg(ind_avg,:) = 0.5 * (Pavg(ind_avg,:) + Pavg_);
-% end
+%     Nest_min = round(0.1 / Ts);
 % 
-% G = frd(Pavg(:,2) ./ Pavg(:,1), f, Ts, 'Units', 'Hz');
-% C = frd(abs(Pavg(:,2)).^2 ./ (Pavg(:,1) .* Pavg(:,3)), f, Ts, 'Units', 'Hz');
+%     [~, ~, f, Pavg] = estimate_frequency_response(data.values(:,1), ...
+%         data.values(:,i + 1), window, Noverlap, Nest, Ts);
+%     while (true)
+%         Nest = floor(Nest / 2.0);
+%         Noverlap = round(koverlap * Nest);
+%         window   = hann(Nest);
+%         if (Nest < Nest_min)
+%             break;
+%         end
+%         [~, ~, f_, Pavg_] = estimate_frequency_response(data.values(:,1), ...
+%             data.values(:,i + 1), window, Noverlap, Nest, Ts);
+%         f_min = 10^(log10(min(f_(f_ > 0))) + 1.2);
+%         ind_avg = f >= f_min & f <= 1/2/Ts - f_min;
+%         Pavg_ = interp1(f_, Pavg_, f(ind_avg), 'linear');
+%         Pavg(ind_avg,:) = 0.5 * (Pavg(ind_avg,:) + Pavg_);
+%     end
+% 
+%     if i == 1
+%         G1 = frd(Pavg(:,2) ./ Pavg(:,1), f, Ts, 'Units', 'Hz');
+%         C1 = frd(abs(Pavg(:,2)).^2 ./ (Pavg(:,1) .* Pavg(:,3)), f, Ts, 'Units', 'Hz');
+%     else
+%         G2 = frd(Pavg(:,2) ./ Pavg(:,1), f, Ts, 'Units', 'Hz');
+%         C2 = frd(abs(Pavg(:,2)).^2 ./ (Pavg(:,1) .* Pavg(:,3)), f, Ts, 'Units', 'Hz');
+%     end
+% end
+
 
 figure(2)
 plot(data.time, data.values), grid on
