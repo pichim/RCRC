@@ -17,7 +17,7 @@ while (serialStream.isBusy())
     pause(0.1);
 end
 
-% Access the data
+% access the data
 data = serialStream.getData();
 
 return
@@ -59,19 +59,17 @@ Dlp = sqrt(3) / 2;
 wlp = 2 * pi * 10;
 Glp = c2d(tf(wlp^2, [1 2*Dlp*wlp wlp^2]), Ts, 'tustin');
 
-
+% frequency response estimation
 Nest     = round(2.0 / Ts);
 koverlap = 0.9;
 Noverlap = round(koverlap * Nest);
 window   = hann(Nest);
 
-% inp = data.values(:,1);
-% out = data.values(:,2);
+
 inp = apply_rotfiltfilt(Glp, data.values(:,4), data.values(:,1));
 out = apply_rotfiltfilt(Glp, data.values(:,4), data.values(:,2));
 [G1, C1] = estimate_frequency_response(inp, out, window, Noverlap, Nest, Ts);
-% inp = data.values(:,1);
-% out = data.values(:,3);
+
 inp = apply_rotfiltfilt(Glp, data.values(:,4), data.values(:,1));
 out = apply_rotfiltfilt(Glp, data.values(:,4), data.values(:,3));
 [G2, C2] = estimate_frequency_response(inp, out, window, Noverlap, Nest, Ts);

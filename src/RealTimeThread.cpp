@@ -33,14 +33,14 @@ void RealTimeThread::threadTask()
     timer.start();
     microseconds time_previous_us{0};
 
+    // sampling time
+    const float Ts = static_cast<float>(RTT_PERIOD_US) * 1.0e-6f;
+
     // serial stream either to matlab or to the openlager
     SerialStream serialStream(RTT_NUM_OF_FLOATS,
                               RTT_TX,
                               RTT_RX,
                               RTT_BAUDRATE);
-
-    // sampling time
-    const float Ts = static_cast<float>(RTT_PERIOD_US) * 1.0e-6f;
 
     // analog inputs
     AnalogIn ain1(RTT_AIN1);
@@ -56,6 +56,7 @@ void RealTimeThread::threadTask()
     const float amplitude = 0.9f * (3.3f / 2.0f);
     const float offset = 3.3f / 2.0f;
     Chirp chirp(f0, f1, t1, Ts);
+    float sinarg = 0.0f;
 
     // give the openLager 1000 msec time to start
     thread_sleep_for(1000);
@@ -80,8 +81,6 @@ void RealTimeThread::threadTask()
         float uc_2 = ain2.read() * 3.3f;
         float u_e = offset;
 
-        float sinarg = 0.0f;
-
         // here lifes the main logic of the mini segway
         if (_do_execute) {
 
@@ -99,12 +98,12 @@ void RealTimeThread::threadTask()
             // write analog output
             aout.write(u_e / 3.3f);
 
-            // send data to serial stream
-            serialStream.write(dtime_us); //  0
-            serialStream.write(u_e);        //  1
-            serialStream.write(uc_1);       //  2
-            serialStream.write(uc_2);       //  3
-            serialStream.write(sinarg);     //  4
+            // send data to serial stream (openlager or laptop / pc)
+            serialStream.write( dtime_us ); //  0
+            serialStream.write( u_e );      //  1
+            serialStream.write( uc_1 );     //  2
+            serialStream.write( uc_2 );     //  3
+            serialStream.write( sinarg );   //  4
             serialStream.send();
 
             led = 1;
