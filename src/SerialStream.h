@@ -1,12 +1,11 @@
-#ifndef SERIAL_STREAM_H_
-#define SERIAL_STREAM_H_
+#pragma once
 
 #define S_STREAM_DO_USE_SERIAL_PIPE true
 
 #if S_STREAM_DO_USE_SERIAL_PIPE
-#include "SerialPipe/serial_pipe.h"
+    #include "SerialPipe/serial_pipe.h"
 #else
-#include "mbed.h"
+    #include "mbed.h"
 #endif
 
 #define S_STREAM_NUM_OF_FLOATS_MAX 30 // tested at 2 kHz 20 floats
@@ -27,14 +26,14 @@ public:
     void reset();
 
 private:
+    char _buffer[4 * S_STREAM_NUM_OF_FLOATS_MAX];
+    uint8_t _buffer_size;
+    uint8_t _byte_cntr{0};
 #if S_STREAM_DO_USE_SERIAL_PIPE
     SerialPipe _SerialPipe;
 #else
     BufferedSerial _BufferedSerial;
 #endif
-    char _buffer[4 * S_STREAM_NUM_OF_FLOATS_MAX];
-    uint8_t _buffer_size;
-    uint8_t _byte_cntr{0};
 
     typedef struct byte_msg_s {
         uint8_t byte{0};
@@ -48,5 +47,3 @@ private:
     void resetByteMsg(byte_msg_t& byte_msg);
     void sendNumOfFloatsOnce();
 };
-
-#endif /* SERIAL_STREAM_H_ */
