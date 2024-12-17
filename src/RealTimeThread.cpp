@@ -81,7 +81,7 @@ void RealTimeThread::threadTask()
         float uc_2 = ain2.read() * 3.3f;
         float u_e = offset;
 
-        // here lifes the main logic of the mini segway
+        // main logic
         if (_do_execute) {
 
             // perform frequency response measurement
@@ -98,7 +98,7 @@ void RealTimeThread::threadTask()
             // write analog output
             aout.write(u_e / 3.3f);
 
-            // send data to serial stream (openlager or laptop / pc)
+            // send data to serial stream (openlager and laptop / pc)
             serialStream.write( dtime_us ); //  0
             serialStream.write( u_e );      //  1
             serialStream.write( uc_1 );     //  2

@@ -1,9 +1,24 @@
 clc, clear all
-%%
+%% openlager
 
-% NUCLEO_H743ZI2 | NUCLEO_F446RE | NUCLEO_L432KC
-% 'COM12'        | 'COM6'        | 'COM10'
-port = 'COM19';
+% % TODO: Test this, not used in a while
+% file_id = fopen('LOG278.TXT');
+% 
+% num_of_floats = fread(file_id, 1, 'uint8')
+% data_raw = fread(file_id, 'single');
+% length(data_raw)
+% fclose(file_id);
+% 
+% data_raw = data_raw(1:floor( length(data_raw)/num_of_floats ) * num_of_floats);
+% data.values = reshape(data_raw, [num_of_floats, length(data_raw)/num_of_floats]).';         
+% data.time = cumsum(data.values(:,1)) * 1e-6;
+% data.time = data.time - data.time(1);
+% data.values = data.values(:,2:end);
+
+
+%% streaming to matlab
+
+port = 'COM6';
 baudrate = 2e6;
 
 if (~exist('serialStream', 'var'))
@@ -24,21 +39,6 @@ return
 
 %%
 
-% parameters
-R2 = 4.7e3;  % Ohm
-R1 = R2 + 12e3;
-C1 = 470e-9; % F
-C2 = C1;
-
-% rcrc
-a = R1*R2*C1*C2
-b = R1*C1 + R1*C2 + R2*C2
-
-% transfer function
-s = tf('s');
-Grcrc_mod = 1 / (a*s^2 + b*s + 1);
-
-
 Ts = mean(diff(data.time));
 
 figure(1)
@@ -53,6 +53,20 @@ xlabel('Time (sec)'), ylabel('dTime (mus)')
 xlim([0 data.time(end-1)])
 ylim([0 1.2*max(diff(data.time * 1e6))])
 
+
+% parameters
+R1 = 4.7e3;  % Ohm
+R2 = R1;
+C1 = 470e-9; % F
+C2 = C1;
+
+% rcrc
+a = R1*R2*C1*C2
+b = R1*C1 + R1*C2 + R2*C2
+
+% transfer function
+s = tf('s');
+Grcrc = 1 / (a*s^2 + b*s + 1);
 
 % rotating filter
 Dlp = sqrt(3) / 2;
@@ -74,45 +88,13 @@ inp = apply_rotfiltfilt(Glp, data.values(:,4), data.values(:,1));
 out = apply_rotfiltfilt(Glp, data.values(:,4), data.values(:,3));
 [G2, C2] = estimate_frequency_response(inp, out, window, Noverlap, Nest, Ts);
 
-% for i = 1:2
-%     Nest     = round(2.0 / Ts);
-%     koverlap = 0.5;
-%     Noverlap = round(koverlap * Nest);
-%     window   = hann(Nest);
-%     Nest_min = round(0.1 / Ts);
-% 
-%     [~, ~, f, Pavg] = estimate_frequency_response(data.values(:,1), ...
-%         data.values(:,i + 1), window, Noverlap, Nest, Ts);
-%     while (true)
-%         Nest = floor(Nest / 2.0);
-%         Noverlap = round(koverlap * Nest);
-%         window   = hann(Nest);
-%         if (Nest < Nest_min)
-%             break;
-%         end
-%         [~, ~, f_, Pavg_] = estimate_frequency_response(data.values(:,1), ...
-%             data.values(:,i + 1), window, Noverlap, Nest, Ts);
-%         f_min = 10^(log10(min(f_(f_ > 0))) + 1.2);
-%         ind_avg = f >= f_min & f <= 1/2/Ts - f_min;
-%         Pavg_ = interp1(f_, Pavg_, f(ind_avg), 'linear');
-%         Pavg(ind_avg,:) = 0.5 * (Pavg(ind_avg,:) + Pavg_);
-%     end
-% 
-%     if i == 1
-%         G1 = frd(Pavg(:,2) ./ Pavg(:,1), f, Ts, 'Units', 'Hz');
-%         C1 = frd(abs(Pavg(:,2)).^2 ./ (Pavg(:,1) .* Pavg(:,3)), f, Ts, 'Units', 'Hz');
-%     else
-%         G2 = frd(Pavg(:,2) ./ Pavg(:,1), f, Ts, 'Units', 'Hz');
-%         C2 = frd(abs(Pavg(:,2)).^2 ./ (Pavg(:,1) .* Pavg(:,3)), f, Ts, 'Units', 'Hz');
-%     end
-% end
-
 figure(2)
 plot(data.time, data.values), grid on
 
+
 figure(3)
-bode(G1, G2, Grcrc_mod, 2*pi*G1.Frequency(G1.Frequency < 1/2/Ts)), grid on
-legend('G1','G2', 'Grcrc mod')
+bode(G1, G2, Grcrc, 2*pi*G1.Frequency(G1.Frequency < 1/2/Ts)), grid on
+legend('G1', 'G2', 'Grcrc mod', 'Location', 'best')
 
 opt = bodeoptions('cstprefs');
 opt.MagUnits = 'abs';
@@ -120,5 +102,3 @@ opt.MagScale = 'linear';
 
 figure(4)
 bodemag(C1, C2, 2*pi*G1.Frequency(G1.Frequency < 1/2/Ts), opt), grid on
-set(gca, 'YScale', 'linear')
-
