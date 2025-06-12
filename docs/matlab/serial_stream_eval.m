@@ -18,6 +18,7 @@ end
 % access the data
 data = serialStream.getData();
 
+% debug stuff
 lenth_time = length(data.time);
 [Ndata, Nsignals] = size(data.values);
 disp(lenth_time)

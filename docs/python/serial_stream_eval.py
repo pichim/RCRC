@@ -1,3 +1,5 @@
+# conda create --name rcrc-env python=3.11.4 numpy scipy matplotlib pyserial control ipykernel (optional: slycot pytest)
+
 import time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,9 +15,10 @@ serialStream.start()
 while serialStream.is_busy_flag():
     time.sleep(0.1)
 
-#  access the data
+# access the data
 data = serialStream.get_data()
 
+# debug stuff
 length_time = len(data['time'])
 Ndata, Nsignals = data['values'].shape
 print(length_time)
