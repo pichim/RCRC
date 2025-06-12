@@ -30,7 +30,7 @@ def get_step_resp_from_frd(G_frd, Ts, f_max=None):
     step_resp = 2 * np.cumsum(np.real(np.fft.ifft(g)))
     # Use double the sampling time because of 'symmetric' option
     time_vec = np.arange(len(step_resp)) * 2 * Ts
-    return step_resp, time_vec
+    return time_vec, step_resp
 
 
 port = "/dev/ttyUSB0"
@@ -142,15 +142,15 @@ plt.ylabel("Magnitude")
 # Step responses
 f_max = 800
 
-step_resp_1, step_time = get_step_resp_from_frd(G1, Ts, f_max)
-step_resp_2, _ = get_step_resp_from_frd(G2, Ts, f_max)
+step_time, step_resp_1 = get_step_resp_from_frd(G1, Ts, f_max)
+_, step_resp_2 = get_step_resp_from_frd(G2, Ts, f_max)
 
-step_time_mod, step_resp_mod = ct.step_response(G_rcrc_mod, step_time)
+_, step_resp_mod = ct.step_response(G_rcrc_mod, step_time)
 
 plt.figure(4)
 plt.plot(step_time, step_resp_1, label="G1")
 plt.plot(step_time, step_resp_2, label="G2")
-plt.plot(step_time_mod, step_resp_mod, label="Grcrc mod")
+plt.plot(step_time, step_resp_mod, label="Grcrc mod")
 plt.grid(True)
 plt.xlabel("Time (sec)")
 plt.ylabel("Voltage (V)")
