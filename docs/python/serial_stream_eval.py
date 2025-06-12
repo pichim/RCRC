@@ -8,29 +8,41 @@ import scipy as sp
 from SerialStream import SerialStream
 
 
-def tfestimate(x, y, fs, window, nperseg, noverlap):
-    f, Pxy = sp.signal.csd(x, y, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap)
-    f, Pxx = sp.signal.csd(x, x, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap)
-    G = Pxy / Pxx
-    return f, G
+def estimate_frf_and_coherence(x, y, fs, window, nperseg, noverlap):
+    # Estimate cross spectral density and power spectral densities
+    _, Pxy = sp.signal.csd(x, y, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap, return_onesided=False)
+    _, Pxx = sp.signal.csd(x, x, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap, return_onesided=False)
+    _, Pyy = sp.signal.csd(y, y, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap, return_onesided=False)
+
+    # Calculate frequency
+    freq = np.arange(len(Pxy)) / len(Pxy) * fs  # same as freq = np.linspace(0, len(Pxy)-1, len(Pxy)) / len(Pxy) * fs
+
+    # Calculate frequency response function
+    g = Pxy / Pxx
+
+    # Calculate coherence
+    c = np.abs(Pxy) ** 2 / (Pxx * Pyy)
+    return freq, g, c
 
 
-def get_step_resp_from_frd(G_frd, Ts, f_max=None):
-    if f_max is None:
-        f_max = np.max(G_frd.frequency) / (2 * np.pi)  # in Hz
+def get_step_resp_from_frd(G_frd, f_max_hz):
+    # Extract complex frequency response
+    g = G_frd.magnitude.flatten() * np.exp(1j * G_frd.phase.flatten())
+    if np.isnan(np.abs(g[0])):  # TODO: interpolate based on point 2 and 3
+        g[0] = g[1]
 
-    g = G_frd.magnitude.flatten() * np.exp(1j * G_frd.phase.flatten())  # complex response
+    # Get frequency vector (rad/s -> Hz)
+    freq = G_frd.frequency / (2 * np.pi)
 
-    if np.isnan(np.abs(g[0])):
-        g[0] = g[1]  # Todo: interpolate based on point 2 and 3
+    # Set frequencies above f_max_hz to zero
+    df = freq[1] - freq[0]
+    ind = (freq >= f_max_hz) & (freq <= freq[-1] - f_max_hz + df)
+    g[ind] = 0
 
-    freq_hz = G_frd.frequency / (2 * np.pi)  # rad/s -> Hz
-    g[freq_hz >= f_max] = 0
+    # Step response is cumulative sum of real part of IFFT
+    step_resp = np.cumsum(np.real(np.fft.ifft(g)))
 
-    step_resp = 2 * np.cumsum(np.real(np.fft.ifft(g)))
-    # Use double the sampling time because of 'symmetric' option
-    time_vec = np.arange(len(step_resp)) * 2 * Ts
-    return time_vec, step_resp
+    return step_resp
 
 
 port = "/dev/ttyUSB0"
@@ -90,22 +102,20 @@ s = ct.tf([1, 0], 1)
 G_rcrc_mod = 1 / (a * s**2 + b * s + 1)
 
 # Frequency response estimation
-N_est = round(0.5 / Ts)
+N_est = round(2.0 / Ts)
 k_overlap = 0.5
 N_overlap = round(k_overlap * N_est)
 window = sp.signal.windows.hann(N_est)
 
 inp = np.diff(data["values"][:, ind["u_e"]])
 out = np.diff(data["values"][:, ind["u_c1"]])
-freq, g = tfestimate(inp, out, fs=1 / Ts, window=window, nperseg=N_est, noverlap=N_overlap)
-_, c = sp.signal.coherence(inp, out, fs=1 / Ts, window=window, nperseg=N_est, noverlap=N_overlap)
+freq, g, c = estimate_frf_and_coherence(inp, out, fs=1 / Ts, window=window, nperseg=N_est, noverlap=N_overlap)
 G1 = ct.frd(g, 2 * np.pi * freq)
 C1 = ct.frd(c, 2 * np.pi * freq)
 
 inp = np.diff(data["values"][:, ind["u_e"]])
 out = np.diff(data["values"][:, ind["u_c2"]])
-freq, g = tfestimate(inp, out, fs=1 / Ts, window=window, nperseg=N_est, noverlap=N_overlap)
-_, c = sp.signal.coherence(inp, out, fs=1 / Ts, window=window, nperseg=N_est, noverlap=N_overlap)
+freq, g, c = estimate_frf_and_coherence(inp, out, fs=1 / Ts, window=window, nperseg=N_est, noverlap=N_overlap)
 G2 = ct.frd(g, 2 * np.pi * freq)
 C2 = ct.frd(c, 2 * np.pi * freq)
 
@@ -113,37 +123,39 @@ mag_G1, phase_G1, _ = ct.frequency_response(G1, 2 * np.pi * freq)
 mag_G2, phase_G2, _ = ct.frequency_response(G2, 2 * np.pi * freq)
 mag_Grcrc, phase_Grcrc, _ = ct.frequency_response(G_rcrc_mod, 2 * np.pi * freq)
 
+# only show frequencies below Nyquist frequency
+ind = freq < 1 / (2 * Ts)
+
 plt.figure(2)
 plt.subplot(2, 1, 1)
-plt.semilogx(freq, 20 * np.log10(mag_G1.flatten()), label="G1")
-plt.semilogx(freq, 20 * np.log10(mag_G2.flatten()), label="G2")
-plt.semilogx(freq, 20 * np.log10(mag_Grcrc.flatten()), label="Grcrc mod")
+plt.semilogx(freq[ind], 20 * np.log10(mag_G1.flatten()[ind]), label="G1")
+plt.semilogx(freq[ind], 20 * np.log10(mag_G2.flatten()[ind]), label="G2")
+plt.semilogx(freq[ind], 20 * np.log10(mag_Grcrc.flatten()[ind]), label="Grcrc mod")
 plt.grid(True, which="both", axis="both")
-plt.legend(loc="best")
 plt.xlabel("Frequency (Hz)")
 plt.ylabel("Magnitude (dB)")
 plt.subplot(2, 1, 2)
-plt.semilogx(freq, 180 / np.pi * np.arctan2(np.sin(phase_G1.flatten()), np.cos(phase_G1.flatten())), label="G1")
-plt.semilogx(freq, 180 / np.pi * np.arctan2(np.sin(phase_G2.flatten()), np.cos(phase_G2.flatten())), label="G2")
-plt.semilogx(freq, 180 / np.pi * np.arctan2(np.sin(phase_Grcrc.flatten()), np.cos(phase_Grcrc.flatten())), label="Grcrc mod")
+plt.semilogx(freq[ind], 180 / np.pi * np.arctan2(np.sin(phase_G1.flatten()[ind]), np.cos(phase_G1.flatten()[ind])), label="G1")
+plt.semilogx(freq[ind], 180 / np.pi * np.arctan2(np.sin(phase_G2.flatten()[ind]), np.cos(phase_G2.flatten()[ind])), label="G2")
+plt.semilogx(freq[ind], 180 / np.pi * np.arctan2(np.sin(phase_Grcrc.flatten()[ind]), np.cos(phase_Grcrc.flatten()[ind])), label="Grcrc mod")
 plt.grid(True, which="both", axis="both")
 plt.legend(loc="best")
 plt.xlabel("Frequency (Hz)")
 plt.ylabel("Phase (deg)")
 
 plt.figure(3)
-plt.semilogx(freq, C1.magnitude.flatten(), label="C1")
-plt.semilogx(freq, C2.magnitude.flatten(), label="C2")
+plt.semilogx(freq[ind], C1.magnitude.flatten()[ind], label="C1")
+plt.semilogx(freq[ind], C2.magnitude.flatten()[ind], label="C2")
 plt.grid(True, which="both", axis="both")
 plt.legend(loc="best")
 plt.xlabel("Frequency (Hz)")
-plt.ylabel("Magnitude")
+plt.ylabel("Magnitude (dB)")
 
 # Step responses
 f_max = 800
-
-step_time, step_resp_1 = get_step_resp_from_frd(G1, Ts, f_max)
-_, step_resp_2 = get_step_resp_from_frd(G2, Ts, f_max)
+step_time = np.arange(N_est) * Ts
+step_resp_1 = get_step_resp_from_frd(G1, f_max)
+step_resp_2 = get_step_resp_from_frd(G2, f_max)
 
 _, step_resp_mod = ct.step_response(G_rcrc_mod, step_time)
 

@@ -1,18 +1,18 @@
-function [step_resp, time] = get_step_resp_from_frd(G_frd, Ts, f_max)
+function step_resp = get_step_resp_from_frd(G, f_max)
 
-    % handle function call without f_max specified
-    if (~exist('f_max', 'var') || isempty(f_max))
-        f_max = max(G_frd.Frequency);
-    end
-
-    g = squeeze(G_frd.ResponseData);
-    if isnan(abs(g(1))) % Todo: interpolate based on point 2 and 3
+    % Extract complex frequency response
+    g = squeeze(G.ResponseData);
+    if isnan(abs(g(1))) % TODO: interpolate based on point 2 and 3
         g(1) = g(2);
     end
-    
-    g(G_frd.Frequency >= f_max) = 0;
-    
-    step_resp = cumsum(real(ifft( g, 'symmetric' )));
-    % use double the samling time because of the 'symmetric' option
-    time = (0:length(step_resp)-1).' * 2*Ts;
+
+    % Get frequency vector
+    freq = G.Frequency;
+
+    % Set frequencies above f_max_hz to zero
+    g(freq >= f_max & freq <= freq(end) - f_max + freq(2)) = 0;
+
+    % Step response is cumulative sum of real part of IFFT
+    step_resp = cumsum(real(ifft(g)));
+
 end

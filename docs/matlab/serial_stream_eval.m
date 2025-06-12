@@ -64,27 +64,27 @@ s = tf('s');
 G_rcrc_mod = 1 / (a*s^2 + b*s + 1);
 
 % Frequency response estimation
-Nest     = round(0.5 / Ts);
+Nest     = round(2.0 / Ts);
 koverlap = 0.5;
 Noverlap = round(koverlap * Nest);
 window   = hann(Nest);
 
 inp = diff( data.values(:,ind.u_e ) );
 out = diff( data.values(:,ind.u_c1) );
-[g, freq] = tfestimate(inp, out, window, Noverlap, Nest, 1/Ts);
-c         = mscohere(inp, out, window, Noverlap, Nest, 1/Ts);
-G1 = frd(g, freq, 'Units', 'Hz'); % frd(g, f, Ts, 'Units', 'Hz');
-C1 = frd(c, freq, 'Units', 'Hz'); % frd(c, f, Ts, 'Units', 'Hz');
+[g, freq] = tfestimate(inp, out, window, Noverlap, Nest, 1/Ts, 'twosided');
+c         = mscohere(inp, out, window, Noverlap, Nest, 1/Ts, 'twosided');
+G1 = frd(g, freq, 'Units', 'Hz'); % frd(g, freq, Ts, 'Units', 'Hz');
+C1 = frd(c, freq, 'Units', 'Hz'); % frd(c, freq, Ts, 'Units', 'Hz');
 
 inp = diff( data.values(:,ind.u_e ) );
 out = diff( data.values(:,ind.u_c2) );
-[g, freq] = tfestimate(inp, out, window, Noverlap, Nest, 1/Ts);
-c         = mscohere(inp, out, window, Noverlap, Nest, 1/Ts);
-G2 = frd(g, freq, 'Units', 'Hz'); % frd(g, f, Ts, 'Units', 'Hz');
-C2 = frd(c, freq, 'Units', 'Hz'); % frd(c, f, Ts, 'Units', 'Hz');
+[g, freq] = tfestimate(inp, out, window, Noverlap, Nest, 1/Ts, 'twosided');
+c         = mscohere(inp, out, window, Noverlap, Nest, 1/Ts, 'twosided');
+G2 = frd(g, freq, 'Units', 'Hz'); % frd(g, freq, Ts, 'Units', 'Hz');
+C2 = frd(c, freq, 'Units', 'Hz'); % frd(c, freq, Ts, 'Units', 'Hz');
 
 figure(2)
-bode(G1, G2, G_rcrc_mod, 2*pi*G1.Frequency), grid on
+bode(G1, G2, G_rcrc_mod, 2*pi*G1.Frequency(G1.Frequency < 1/(2*Ts))), grid on
 legend('G1', 'G2', 'Grcrc mod', 'Location', 'best')
 
 opt = bodeoptions('cstprefs');
@@ -92,17 +92,18 @@ opt.MagUnits = 'abs';
 opt.MagScale = 'linear';
 
 figure(3)
-bodemag(C1, C2, 2*pi*G1.Frequency), grid on
+bodemag(C1, C2, 2*pi*G1.Frequency(C1.Frequency < 1/(2*Ts))), grid on
 
 % Step responses
 f_max = 800;
-[step_resp_1, step_time] = get_step_resp_from_frd(G1, Ts, f_max);
-step_resp_2              = get_step_resp_from_frd(G2, Ts, f_max);
+step_time = (0:Nest-1).'*Ts;
+step_resp_1 = get_step_resp_from_frd(G1, f_max);
+step_resp_2 = get_step_resp_from_frd(G2, f_max);
 
-[step_resp_mod, step_time_mod] = step(G_rcrc_mod);
+step_resp_mod = step(G_rcrc_mod, step_time);
 
 figure(4)
 plot(step_time, [step_resp_1, step_resp_2]), grid on, hold on
-plot(step_time_mod, step_resp_mod), hold off
+plot(step_time, step_resp_mod), hold off
 xlabel('Time (sec)'), ylabel('Voltage (V)')
 xlim([0 0.05])
