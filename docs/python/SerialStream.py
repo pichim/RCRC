@@ -3,11 +3,12 @@ import time
 import math
 import numpy as np
 
+
 class SerialStream:
     def __init__(self, port, baudrate):
         self.port = port
         self.baudrate = baudrate
-        self.serial_port = serial.Serial(self.port, self.baudrate)
+        self.SerialPort = serial.Serial(self.port, self.baudrate)
         self.data = np.zeros(int(1e8))  # preallocate big data array
         self.reset()
 
@@ -20,24 +21,28 @@ class SerialStream:
         self.is_busy = True
         self.max_trigger_attempts = 5
         self.trigger_attempts = 0
-        self.timer = time.time()  # ensure timer always initialized
+        self.Timer = time.time()
+        self.LoggingTimer = time.time()
+        self.last_logging_print_time = 0
 
     def start(self):
         self.send_start_byte()
 
         while True:
-            bytes_readable = self.serial_port.in_waiting
+            bytes_readable = self.SerialPort.in_waiting
 
             # First measurement: receive num_of_floats
             if self.is_waiting_for_first_measurement and bytes_readable > 0:
 
                 self.is_waiting_for_first_measurement = False
-                self.num_of_floats = int.from_bytes(self.serial_port.read(1), 'little')
+                self.num_of_floats = int.from_bytes(self.SerialPort.read(1), "little")
 
                 bytes_readable -= 1
 
                 print(f"SerialStream started, logging {self.num_of_floats} signals")
                 self.timeout = 0.3
+
+                self.LoggingTimer = time.time()
 
                 # TODO: After receiving num_of_floats, the serial buffer may contain
                 # misaligned floats if the sender was running continuously.
@@ -45,21 +50,21 @@ class SerialStream:
                 #
                 # --- FULL ALIGNMENT CODE TEMPLATE ---
                 #
-                # bytes_left = self.serial_port.in_waiting
+                # bytes_left = self.SerialPort.in_waiting
                 # misalignment = bytes_left % (self.num_of_floats * 4)
                 # if misalignment > 0:
                 #     print(f"WARNING: SerialStream: Discarding {misalignment} bytes to align stream")
-                #     self.serial_port.read(misalignment)
+                #     self.SerialPort.read(misalignment)
                 #
                 # # Optionally: Read 1 full record immediately to force alignment and
                 # # guarantee correct first time step.
-                # if self.serial_port.in_waiting >= self.num_of_floats * 4:
-                #     data_raw = self.serial_port.read(self.num_of_floats * 4)
+                # if self.SerialPort.in_waiting >= self.num_of_floats * 4:
+                #     data_raw = self.SerialPort.read(self.num_of_floats * 4)
                 #     data_floats = np.frombuffer(data_raw, dtype=np.float32)
                 #     ind_start = self.ind_end
                 #     self.ind_end = ind_start + self.num_of_floats
                 #     self.data[ind_start:self.ind_end] = data_floats
-                #     self.timer = time.time()
+                #     self.Timer = time.time()
                 #
                 # --- END OF ALIGNMENT CODE TEMPLATE ---
                 #
@@ -72,17 +77,24 @@ class SerialStream:
             if bytes_readable >= 4:
                 num_of_floats_readable = math.floor(bytes_readable / 4)
                 if num_of_floats_readable > 0:
-                    data_raw = self.serial_port.read(int(num_of_floats_readable * 4))
+                    data_raw = self.SerialPort.read(int(num_of_floats_readable * 4))
                     data_floats = np.frombuffer(data_raw, dtype=np.float32)
 
                     ind_start = self.ind_end + 1  # Match MATLAB 1-based indexing logic
                     self.ind_end = ind_start + num_of_floats_readable - 1
-                    self.data[ind_start-1:self.ind_end] = data_floats[:num_of_floats_readable]
+                    self.data[ind_start - 1 : self.ind_end] = data_floats[:num_of_floats_readable]
 
-                    self.timer = time.time()
+                    self.Timer = time.time()
+
+            # Logging print (every 2 sec)
+            if not self.is_waiting_for_first_measurement:
+                logging_time = time.time() - self.LoggingTimer
+                while logging_time >= self.last_logging_print_time + 2.0:
+                    print(f"             logging for {round(self.last_logging_print_time + 2.0):.2f} seconds...")
+                    self.last_logging_print_time += 2.0
 
             # Timeout check:
-            if time.time() - self.timer > self.timeout:
+            if time.time() - self.Timer > self.timeout:
                 if self.is_waiting_for_first_measurement and self.trigger_attempts < self.max_trigger_attempts:
                     self.send_start_byte()
                 else:
@@ -90,6 +102,7 @@ class SerialStream:
                         print(f"SerialStream timeout, logging not triggered after {self.max_trigger_attempts} attempts of waiting {self.timeout:.2f} seconds")
                     else:
                         print(f"SerialStream ended with {self.timeout:.2f} seconds timeout")
+                        print(f"             logged for {round(logging_time):.2f} seconds")
                         print(f"             measured {self.ind_end} datapoints")
                     self.is_busy = False
                     break
@@ -113,15 +126,12 @@ class SerialStream:
         time_array = time_array - time_array[0]
 
         # Remove delta time column:
-        return {
-            'time': time_array,
-            'values': values[:, 1:]
-        }
+        return {"time": time_array, "values": values[:, 1:]}
 
     def send_start_byte(self, start_byte=255):
         # Flush serial port to ensure no old data is left
-        self.serial_port.reset_input_buffer()
-        self.timer = time.time()
-        self.serial_port.write(bytes([start_byte]))
+        self.SerialPort.reset_input_buffer()
+        self.Timer = time.time()
+        self.SerialPort.write(bytes([start_byte]))
         self.trigger_attempts += 1
         print(f"SerialStream waiting for {self.timeout:.2f} seconds...")

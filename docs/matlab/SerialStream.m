@@ -5,14 +5,16 @@ classdef SerialStream < handle
         baudrate
         SerialPort
         data
-        Timer
+        timeout
         is_waiting_for_first_measurement
         ind_end
-        timeout
         num_of_floats
         is_busy
         max_trigger_attempts
         trigger_attempts
+        Timer
+        LoggingTimer
+        last_logging_print_time
     end
 %%
     methods
@@ -26,7 +28,7 @@ classdef SerialStream < handle
         end
 
         function reset(obj)
-            obj.data = 0 * obj.data;
+            obj.data = zeros(size(obj.data));
             obj.timeout = 3.0;
             obj.is_waiting_for_first_measurement = true;
             obj.ind_end = 0;
@@ -34,7 +36,9 @@ classdef SerialStream < handle
             obj.is_busy = true;
             obj.max_trigger_attempts = 5;
             obj.trigger_attempts = 0;
-            obj.Timer = tic; % ensure Timer always initialized
+            obj.Timer = tic;
+            obj.LoggingTimer = tic;
+            obj.last_logging_print_time = 0;
         end
 
         function start(obj)
@@ -53,6 +57,8 @@ classdef SerialStream < handle
 
                     fprintf("SerialStream started, logging %d signals\n", obj.num_of_floats);
                     obj.timeout = 0.3;
+
+                    obj.LoggingTimer = tic;
 
                     % TODO: After receiving num_of_floats, the serial buffer may contain
                     % misaligned floats if the sender was running continuously.
@@ -99,6 +105,15 @@ classdef SerialStream < handle
                     end
                 end
 
+                % Logging print (every 2 sec)
+                if (~obj.is_waiting_for_first_measurement)
+                    logging_time = toc(obj.LoggingTimer);
+                    while (logging_time >= obj.last_logging_print_time + 2.0)
+                        fprintf("             logging for %0.2f seconds...\n", round(obj.last_logging_print_time + 2.0));
+                        obj.last_logging_print_time = obj.last_logging_print_time + 2.0;
+                    end
+                end
+
                 % Timeout check:
                 if (toc(obj.Timer) > obj.timeout)
 
@@ -110,6 +125,7 @@ classdef SerialStream < handle
                                 obj.max_trigger_attempts, obj.timeout);
                         else
                             fprintf("SerialStream ended with %0.2f seconds timeout\n", obj.timeout);
+                            fprintf("             logged for %0.2f seconds\n", round(logging_time));
                             fprintf("             measured %d datapoints\n", obj.ind_end);
                         end
                         obj.is_busy = false;
