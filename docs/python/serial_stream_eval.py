@@ -68,7 +68,15 @@ except Exception as e:
     print("Data Stream not triggered.")
     exit()
 
-# Evaluating the data
+# Save the data
+filename = "docs/python/data_00.npz"
+np.savez(filename, **data)
+
+# Load the data
+loaded = np.load(filename)
+data = {"time": loaded["time"], "values": loaded["values"]}
+
+# Evaluate time
 
 Ts = np.mean(np.diff(data["time"]))
 
@@ -80,6 +88,8 @@ plt.xlabel("Time (sec)")
 plt.ylabel("dTime (mus)")
 plt.xlim([0, data["time"][-2]])
 plt.ylim([0, 1.2 * np.max(np.diff(data["time"]) * 1e6)])
+
+# Evaluate the data
 
 # Defining the indices for the data columns
 ind = {}

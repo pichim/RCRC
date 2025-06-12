@@ -27,8 +27,13 @@ catch exception
     return
 end
 
+% Save the data
+save data_00.mat data
 
-%% Evaluating the data
+% Load the data
+load data_00.mat
+
+%% Evaluate time
 
 Ts = mean(diff(data.time));
 
@@ -43,6 +48,9 @@ title( sprintf(['Mean %0.0f mus, ', ...
 xlabel('Time (sec)'), ylabel('dTime (mus)')
 xlim([0 data.time(end-1)])
 ylim([0 1.2*max(diff(data.time * 1e6))])
+
+
+%% Evaluate the data
 
 % Defining the indices for the data columns
 ind.u_e    = 1;
