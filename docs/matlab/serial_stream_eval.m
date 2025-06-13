@@ -79,20 +79,20 @@ window   = hann(Nest);
 
 inp = diff( data.values(:,ind.u_e ) );
 out = diff( data.values(:,ind.u_c1) );
-[g, freq] = tfestimate(inp, out, window, Noverlap, Nest, 1/Ts, 'twosided');
-c         = mscohere(inp, out, window, Noverlap, Nest, 1/Ts, 'twosided');
+[g, freq] = tfestimate(inp, out, window, Noverlap, Nest, 1/Ts);
+c         = mscohere(inp, out, window, Noverlap, Nest, 1/Ts);
 G1 = frd(g, freq, 'Units', 'Hz'); % frd(g, freq, Ts, 'Units', 'Hz');
 C1 = frd(c, freq, 'Units', 'Hz'); % frd(c, freq, Ts, 'Units', 'Hz');
 
 inp = diff( data.values(:,ind.u_e ) );
 out = diff( data.values(:,ind.u_c2) );
-[g, freq] = tfestimate(inp, out, window, Noverlap, Nest, 1/Ts, 'twosided');
-c         = mscohere(inp, out, window, Noverlap, Nest, 1/Ts, 'twosided');
+[g, freq] = tfestimate(inp, out, window, Noverlap, Nest, 1/Ts);
+c         = mscohere(inp, out, window, Noverlap, Nest, 1/Ts);
 G2 = frd(g, freq, 'Units', 'Hz'); % frd(g, freq, Ts, 'Units', 'Hz');
 C2 = frd(c, freq, 'Units', 'Hz'); % frd(c, freq, Ts, 'Units', 'Hz');
 
 figure(2)
-bode(G1, G2, G_rcrc_mod, 2*pi*G1.Frequency(G1.Frequency < 1/(2*Ts))), grid on
+bode(G1, G2, G_rcrc_mod, 2*pi*G1.Frequency), grid on
 legend('G1', 'G2', 'Grcrc mod', 'Location', 'best')
 
 opt = bodeoptions('cstprefs');
@@ -100,7 +100,7 @@ opt.MagUnits = 'abs';
 opt.MagScale = 'linear';
 
 figure(3)
-bodemag(C1, C2, 2*pi*G1.Frequency(C1.Frequency < 1/(2*Ts))), grid on
+bodemag(C1, C2, 2*pi*G1.Frequency), grid on
 
 % Step responses
 f_max = 800;

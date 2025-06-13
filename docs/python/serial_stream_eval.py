@@ -10,37 +10,36 @@ from SerialStream import SerialStream
 
 def estimate_frf_and_coherence(x, y, fs, window, nperseg, noverlap):
     # Estimate cross spectral density and power spectral densities
-    _, Pxy = sp.signal.csd(x, y, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap, return_onesided=False)
-    _, Pxx = sp.signal.csd(x, x, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap, return_onesided=False)
-    _, Pyy = sp.signal.csd(y, y, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap, return_onesided=False)
-
-    # Calculate frequency
-    freq = np.arange(len(Pxy)) / len(Pxy) * fs  # same as freq = np.linspace(0, len(Pxy)-1, len(Pxy)) / len(Pxy) * fs
+    freq, Pxy = sp.signal.csd(x, y, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap)
+    _, Pxx = sp.signal.csd(x, x, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap)
+    _, Pyy = sp.signal.csd(y, y, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap)
 
     # Calculate frequency response function
     g = Pxy / Pxx
 
     # Calculate coherence
     c = np.abs(Pxy) ** 2 / (Pxx * Pyy)
+
     return freq, g, c
 
 
 def get_step_resp_from_frd(G_frd, f_max_hz):
     # Extract complex frequency response
     g = G_frd.magnitude.flatten() * np.exp(1j * G_frd.phase.flatten())
-    if np.isnan(np.abs(g[0])):  # TODO: interpolate based on point 2 and 3
-        g[0] = g[1]
+    if np.isnan(np.abs(g[0])) or np.isinf(np.abs(g[0])):
+        g[0] = np.abs(g[1])
 
     # Get frequency vector (rad/s -> Hz)
     freq = G_frd.frequency / (2 * np.pi)
 
     # Set frequencies above f_max_hz to zero
-    df = freq[1] - freq[0]
-    ind = (freq >= f_max_hz) & (freq <= freq[-1] - f_max_hz + df)
-    g[ind] = 0
+    g[freq > f_max_hz] = 0
+
+    # Construct full spectrum
+    g_full = np.concatenate([g, np.conj(g[-2:0:-1])])
 
     # Step response is cumulative sum of real part of IFFT
-    step_resp = np.cumsum(np.real(np.fft.ifft(g)))
+    step_resp = np.cumsum(np.real(np.fft.ifft(g_full)))
 
     return step_resp
 
@@ -133,29 +132,26 @@ mag_G1, phase_G1, _ = ct.frequency_response(G1, 2 * np.pi * freq)
 mag_G2, phase_G2, _ = ct.frequency_response(G2, 2 * np.pi * freq)
 mag_Grcrc, phase_Grcrc, _ = ct.frequency_response(G_rcrc_mod, 2 * np.pi * freq)
 
-# only show frequencies below Nyquist frequency
-ind = freq < 1 / (2 * Ts)
-
 plt.figure(2)
 plt.subplot(2, 1, 1)
-plt.semilogx(freq[ind], 20 * np.log10(mag_G1.flatten()[ind]), label="G1")
-plt.semilogx(freq[ind], 20 * np.log10(mag_G2.flatten()[ind]), label="G2")
-plt.semilogx(freq[ind], 20 * np.log10(mag_Grcrc.flatten()[ind]), label="Grcrc mod")
+plt.semilogx(freq, 20 * np.log10(mag_G1.flatten()), label="G1")
+plt.semilogx(freq, 20 * np.log10(mag_G2.flatten()), label="G2")
+plt.semilogx(freq, 20 * np.log10(mag_Grcrc.flatten()), label="Grcrc mod")
 plt.grid(True, which="both", axis="both")
 plt.xlabel("Frequency (Hz)")
 plt.ylabel("Magnitude (dB)")
 plt.subplot(2, 1, 2)
-plt.semilogx(freq[ind], 180 / np.pi * np.arctan2(np.sin(phase_G1.flatten()[ind]), np.cos(phase_G1.flatten()[ind])), label="G1")
-plt.semilogx(freq[ind], 180 / np.pi * np.arctan2(np.sin(phase_G2.flatten()[ind]), np.cos(phase_G2.flatten()[ind])), label="G2")
-plt.semilogx(freq[ind], 180 / np.pi * np.arctan2(np.sin(phase_Grcrc.flatten()[ind]), np.cos(phase_Grcrc.flatten()[ind])), label="Grcrc mod")
+plt.semilogx(freq, 180 / np.pi * np.arctan2(np.sin(phase_G1.flatten()), np.cos(phase_G1.flatten())), label="G1")
+plt.semilogx(freq, 180 / np.pi * np.arctan2(np.sin(phase_G2.flatten()), np.cos(phase_G2.flatten())), label="G2")
+plt.semilogx(freq, 180 / np.pi * np.arctan2(np.sin(phase_Grcrc.flatten()), np.cos(phase_Grcrc.flatten())), label="Grcrc mod")
 plt.grid(True, which="both", axis="both")
 plt.legend(loc="best")
 plt.xlabel("Frequency (Hz)")
 plt.ylabel("Phase (deg)")
 
 plt.figure(3)
-plt.semilogx(freq[ind], C1.magnitude.flatten()[ind], label="C1")
-plt.semilogx(freq[ind], C2.magnitude.flatten()[ind], label="C2")
+plt.semilogx(freq, C1.magnitude.flatten(), label="C1")
+plt.semilogx(freq, C2.magnitude.flatten(), label="C2")
 plt.grid(True, which="both", axis="both")
 plt.legend(loc="best")
 plt.xlabel("Frequency (Hz)")

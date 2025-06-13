@@ -52,7 +52,7 @@ void RealTimeThread::threadTask()
     // chirp generator
     const float f0 = 0.1f;
     const float f1 = 1.0f / 2.0f / Ts;
-    const float t1 = 20.0f;
+    const float t1 = 10.0f;
     const float amplitude = 0.9f * (3.3f / 2.0f);
     const float offset = 3.3f / 2.0f;
     Chirp chirp(f0, f1, t1, Ts);
