@@ -33,6 +33,7 @@ save data_00.mat data
 % Load the data
 load data_00.mat
 
+
 %% Evaluate time
 
 Ts = mean(diff(data.time));
@@ -77,19 +78,32 @@ koverlap = 0.5;
 Noverlap = round(koverlap * Nest);
 window   = hann(Nest);
 
-inp = diff( data.values(:,ind.u_e ) );
-out = diff( data.values(:,ind.u_c1) );
-[g, freq] = tfestimate(inp, out, window, Noverlap, Nest, 1/Ts);
-c         = mscohere(inp, out, window, Noverlap, Nest, 1/Ts);
-G1 = frd(g, freq, 'Units', 'Hz'); % frd(g, freq, Ts, 'Units', 'Hz');
-C1 = frd(c, freq, 'Units', 'Hz'); % frd(c, freq, Ts, 'Units', 'Hz');
+% inp = diff( data.values(:,ind.u_e ) );
+% out = diff( data.values(:,ind.u_c1) );
+% [g, freq] = tfestimate(inp, out, window, Noverlap, Nest, 1/Ts);
+% c         = mscohere(inp, out, window, Noverlap, Nest, 1/Ts);
+% G1 = frd(g(2:end), freq(2:end), 'Units', 'Hz'); % frd(g, freq, Ts, 'Units', 'Hz');
+% C1 = frd(c(2:end), freq(2:end), 'Units', 'Hz'); % frd(c, freq, Ts, 'Units', 'Hz');
+% 
+% inp = diff( data.values(:,ind.u_e ) );
+% out = diff( data.values(:,ind.u_c2) );
+% [g, freq] = tfestimate(inp, out, window, Noverlap, Nest, 1/Ts);
+% c         = mscohere(inp, out, window, Noverlap, Nest, 1/Ts);
+% G2 = frd(g(2:end), freq(2:end), 'Units', 'Hz'); % frd(g, freq, Ts, 'Units', 'Hz');
+% C2 = frd(c(2:end), freq(2:end), 'Units', 'Hz'); % frd(c, freq, Ts, 'Units', 'Hz');
 
-inp = diff( data.values(:,ind.u_e ) );
-out = diff( data.values(:,ind.u_c2) );
-[g, freq] = tfestimate(inp, out, window, Noverlap, Nest, 1/Ts);
-c         = mscohere(inp, out, window, Noverlap, Nest, 1/Ts);
-G2 = frd(g, freq, 'Units', 'Hz'); % frd(g, freq, Ts, 'Units', 'Hz');
-C2 = frd(c, freq, 'Units', 'Hz'); % frd(c, freq, Ts, 'Units', 'Hz');
+% rotating filter
+Dlp = sqrt(3) / 2;
+wlp = 2 * pi * 10;
+Glp = c2d(tf(wlp^2, [1 2*Dlp*wlp wlp^2]), Ts, 'tustin');
+
+inp = diff(apply_rotfiltfilt_via_fft(Glp, data.values(:,ind.sinarg), data.values(:,ind.u_e ), Ts));
+out = diff(apply_rotfiltfilt_via_fft(Glp, data.values(:,ind.sinarg), data.values(:,ind.u_c1), Ts));
+[G1, C1] = estimate_frequency_response(inp, out, window, Noverlap, Nest, Ts);
+
+inp = diff(apply_rotfiltfilt_via_fft(Glp, data.values(:,ind.sinarg), data.values(:,ind.u_e ), Ts));
+out = diff(apply_rotfiltfilt_via_fft(Glp, data.values(:,ind.sinarg), data.values(:,ind.u_c2), Ts));
+[G2, C2] = estimate_frequency_response(inp, out, window, Noverlap, Nest, Ts);
 
 figure(2)
 bode(G1, G2, G_rcrc_mod, 2*pi*G1.Frequency), grid on
@@ -100,10 +114,10 @@ opt.MagUnits = 'abs';
 opt.MagScale = 'linear';
 
 figure(3)
-bodemag(C1, C2, 2*pi*G1.Frequency), grid on
+bodemag(C1, C2, 2*pi*G1.Frequency, opt), grid on
 
 % Step responses
-f_max = 800;
+f_max = 0.8 * 1/(2*Ts);
 step_time = (0:Nest-1).'*Ts;
 step_resp_1 = get_step_resp_from_frd(G1, f_max);
 step_resp_2 = get_step_resp_from_frd(G2, f_max);
@@ -113,5 +127,6 @@ step_resp_mod = step(G_rcrc_mod, step_time);
 figure(4)
 plot(step_time, [step_resp_1, step_resp_2]), grid on, hold on
 plot(step_time, step_resp_mod), hold off
+legend('G1', 'G2', 'Grcrc mod', 'Location', 'best')
 xlabel('Time (sec)'), ylabel('Voltage (V)')
 xlim([0 0.05])

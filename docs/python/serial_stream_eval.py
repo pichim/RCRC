@@ -20,22 +20,26 @@ def estimate_frf_and_coherence(x, y, fs, window, nperseg, noverlap):
     # Calculate coherence
     c = np.abs(Pxy) ** 2 / (Pxx * Pyy)
 
-    return freq, g, c
+    # Truncate DC (freq=0) to avoid divide-by-zero issues
+    return freq[1:], g[1:], c[1:]
 
 
 def get_step_resp_from_frd(G_frd, f_max_hz):
     # Extract complex frequency response
     g = G_frd.magnitude.flatten() * np.exp(1j * G_frd.phase.flatten())
-    if np.isnan(np.abs(g[0])) or np.isinf(np.abs(g[0])):
-        g[0] = np.abs(g[1])
 
-    # Get frequency vector (rad/s -> Hz)
+    # Reconstruct DC (simulate symmetry at zero freq)
+    g_dc = g[0]  # Use g[0] again as a placeholder for DC
+    g = np.insert(g, 0, g_dc)  # Prepend DC component
+
+    # Extend frequency vector accordingly
     freq = G_frd.frequency / (2 * np.pi)
+    freq = np.insert(freq, 0, 0.0)
 
-    # Set frequencies above f_max_hz to zero
+    # Zero out above f_max_hz
     g[freq > f_max_hz] = 0
 
-    # Construct full spectrum
+    # Construct full symmetric spectrum
     g_full = np.concatenate([g, np.conj(g[-2:0:-1])])
 
     # Step response is cumulative sum of real part of IFFT
@@ -111,20 +115,20 @@ s = ct.tf([1, 0], 1)
 G_rcrc_mod = 1 / (a * s**2 + b * s + 1)
 
 # Frequency response estimation
-N_est = round(2.0 / Ts)
-k_overlap = 0.5
-N_overlap = round(k_overlap * N_est)
-window = sp.signal.windows.hann(N_est)
+Nest = round(2.0 / Ts)
+koverlap = 0.5
+Noverlap = round(koverlap * Nest)
+window = sp.signal.windows.hann(Nest)
 
 inp = np.diff(data["values"][:, ind["u_e"]])
 out = np.diff(data["values"][:, ind["u_c1"]])
-freq, g, c = estimate_frf_and_coherence(inp, out, fs=1 / Ts, window=window, nperseg=N_est, noverlap=N_overlap)
+freq, g, c = estimate_frf_and_coherence(inp, out, fs=1 / Ts, window=window, nperseg=Nest, noverlap=Noverlap)
 G1 = ct.frd(g, 2 * np.pi * freq)
 C1 = ct.frd(c, 2 * np.pi * freq)
 
 inp = np.diff(data["values"][:, ind["u_e"]])
 out = np.diff(data["values"][:, ind["u_c2"]])
-freq, g, c = estimate_frf_and_coherence(inp, out, fs=1 / Ts, window=window, nperseg=N_est, noverlap=N_overlap)
+freq, g, c = estimate_frf_and_coherence(inp, out, fs=1 / Ts, window=window, nperseg=Nest, noverlap=Noverlap)
 G2 = ct.frd(g, 2 * np.pi * freq)
 C2 = ct.frd(c, 2 * np.pi * freq)
 
@@ -155,11 +159,11 @@ plt.semilogx(freq, C2.magnitude.flatten(), label="C2")
 plt.grid(True, which="both", axis="both")
 plt.legend(loc="best")
 plt.xlabel("Frequency (Hz)")
-plt.ylabel("Magnitude (dB)")
+plt.ylabel("Magnitude (abs)")
 
 # Step responses
-f_max = 800
-step_time = np.arange(N_est) * Ts
+f_max = 0.8 * 1 / (2 * Ts)
+step_time = np.arange(Nest) * Ts
 step_resp_1 = get_step_resp_from_frd(G1, f_max)
 step_resp_2 = get_step_resp_from_frd(G2, f_max)
 
