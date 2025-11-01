@@ -2,12 +2,14 @@
 
 #include "RealTimeThread.h"
 
-// spawn a new thread for the real-time task
-RealTimeThread realTimeThread;
-
 // main thread is just blinking the led on the nucleo
 int main()
 {
+    // spawn a new thread for the real-time task
+    RealTimeThread realTimeThread;
+
+    printf("RCRC Thread started.\r\n");
+
     DigitalOut led1(LED1);
     while (true) {
         led1 = !led1;
